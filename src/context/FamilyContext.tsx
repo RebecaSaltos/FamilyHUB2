@@ -410,4 +410,12 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setAccounts(nextAccounts);
     guardarEnSupabase({ members: nextMembers, accounts: nextAccounts });
 
-    const user:
+   const user: AuthUser = {
+      id: 'usr-' + newMemberId,
+      email: normalizedEmail,
+      name: newMember.name,
+      role: newMember.role,
+      avatar: newMember.avatar,
+      memberId: newMemberId,
+      familyId: inviteCode,
+    };
