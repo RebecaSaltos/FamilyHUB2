@@ -410,7 +410,7 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setAccounts(nextAccounts);
     guardarEnSupabase({ members: nextMembers, accounts: nextAccounts });
 
-   const user: AuthUser = {
+    const user: AuthUser = {
       id: 'usr-' + newMemberId,
       email: normalizedEmail,
       name: newMember.name,
@@ -419,3 +419,545 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       memberId: newMemberId,
       familyId: inviteCode,
     };
+    setCurrentUser(user);
+    setActiveMemberId(newMemberId);
+    setIsAuthModalOpen(false);
+    triggerConfetti();
+    showToast(`¡Cuenta creada con éxito! Bienvenido, ${newMember.name}.`, 'success');
+
+    return { success: true, message: 'Cuenta creada' };
+  };
+
+  const logout = () => {
+    setCurrentUser(null);
+    setActiveMemberId('all');
+    showToast('Sesión cerrada correctamente', 'info');
+  };
+
+  const setActiveTab = (tab: TabType) => {
+    setActiveTabState(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const setActiveMemberId = (id: string) => setActiveMemberIdState(id);
+  const setFamilyName = (name: string) => {
+    setFamilyNameState(name);
+    guardarEnSupabase({ familyName: name });
+    showToast('Nombre de la familia actualizado', 'success');
+  };
+  const setMonthlyIncome = (income: number) => {
+    setMonthlyIncomeState(income);
+    guardarEnSupabase({ monthlyIncome: income });
+  };
+  const setSavingsGoal = (goal: number) => {
+    setSavingsGoalState(goal);
+    guardarEnSupabase({ savingsGoal: goal });
+  };
+
+  const activeMember = members.find(m => m.id === activeMemberId);
+
+  // Members mutations
+  const addMember = (m: Omit<FamilyMember, 'id'>) => {
+    const newMember: FamilyMember = { ...m, id: 'm-' + Date.now() };
+    const next = [...members, newMember];
+    setMembers(next);
+    guardarEnSupabase({ members: next });
+    showToast(`¡Se ha añadido a ${m.name} a la familia!`, 'success');
+  };
+
+  const updateMember = (id: string, updates: Partial<FamilyMember>) => {
+    const next = members.map(m => m.id === id ? { ...m, ...updates } : m);
+    setMembers(next);
+    guardarEnSupabase({ members: next });
+
+    if (currentUser && currentUser.memberId === id) {
+      setCurrentUser(prev => prev ? {
+        ...prev,
+        name: updates.name || prev.name,
+        role: updates.role || prev.role,
+        avatar: updates.avatar || prev.avatar,
+        email: updates.email || prev.email,
+      } : null);
+    }
+    showToast('Perfil actualizado correctamente', 'success');
+  };
+
+  const updateMemberHealthProfile = (id: string, health: {
+    bloodType?: string;
+    allergies?: string[];
+    emergencyContact?: string;
+    medicalNotes?: string;
+  }) => {
+    const next = members.map(m => m.id === id ? { ...m, ...health } : m);
+    setMembers(next);
+    guardarEnSupabase({ members: next });
+    showToast('Ficha médica y datos de salud guardados', 'success');
+  };
+
+  const deleteMember = (id: string) => {
+    if (members.length <= 1) {
+      showToast('Debe haber al menos un miembro en la familia', 'warning');
+      return;
+    }
+    const next = members.filter(m => m.id !== id);
+    setMembers(next);
+    guardarEnSupabase({ members: next });
+    if (activeMemberId === id) setActiveMemberId('all');
+    showToast('Miembro eliminado del hogar', 'info');
+  };
+
+  // Tasks mutations
+  const addTask = (taskData: Omit<TaskItem, 'id' | 'createdAt' | 'completed'>) => {
+    const newTask: TaskItem = {
+      ...taskData,
+      id: 't-' + Date.now(),
+      completed: false,
+      createdAt: new Date().toISOString(),
+    };
+    const next = [newTask, ...tasks];
+    setTasks(next);
+    guardarEnSupabase({ tasks: next });
+    showToast('Nueva tarea añadida', 'success');
+  };
+
+  const updateTask = (id: string, updates: Partial<TaskItem>) => {
+    const next = tasks.map(t => t.id === id ? { ...t, ...updates } : t);
+    setTasks(next);
+    guardarEnSupabase({ tasks: next });
+    showToast('Tarea editada y actualizada', 'success');
+  };
+
+  const toggleTask = (id: string) => {
+    const next = tasks.map(t => {
+      if (t.id === id) {
+        const nextState = !t.completed;
+        if (nextState) triggerConfetti();
+        return {
+          ...t,
+          completed: nextState,
+          completedAt: nextState ? new Date().toISOString() : undefined,
+        };
+      }
+      return t;
+    });
+    setTasks(next);
+    guardarEnSupabase({ tasks: next });
+  };
+
+  const deleteTask = (id: string) => {
+    const next = tasks.filter(t => t.id !== id);
+    setTasks(next);
+    guardarEnSupabase({ tasks: next });
+    showToast('Tarea eliminada', 'info');
+  };
+
+  // Shopping mutations
+  const addShoppingItem = (itemData: Omit<ShoppingItem, 'id' | 'createdAt' | 'completed'>) => {
+    const newItem: ShoppingItem = {
+      ...itemData,
+      id: 's-' + Date.now(),
+      completed: false,
+      createdAt: new Date().toISOString(),
+    };
+    const next = [newItem, ...shoppingItems];
+    setShoppingItems(next);
+    guardarEnSupabase({ shoppingItems: next });
+    showToast('Artículo añadido a la lista de compras', 'success');
+  };
+
+  const addMultipleShoppingItems = (newItems: Array<Omit<ShoppingItem, 'id' | 'createdAt' | 'completed'>>) => {
+    const created: ShoppingItem[] = newItems.map((item, idx) => ({
+      ...item,
+      id: 's-' + (Date.now() + idx),
+      completed: false,
+      createdAt: new Date().toISOString(),
+    }));
+    const next = [...created, ...shoppingItems];
+    setShoppingItems(next);
+    guardarEnSupabase({ shoppingItems: next });
+  };
+
+  const updateShoppingItem = (id: string, updates: Partial<ShoppingItem>) => {
+    const next = shoppingItems.map(s => s.id === id ? { ...s, ...updates } : s);
+    setShoppingItems(next);
+    guardarEnSupabase({ shoppingItems: next });
+    showToast('Producto de compra actualizado', 'success');
+  };
+
+  const toggleShoppingItem = (id: string) => {
+    const next = shoppingItems.map(s => {
+      if (s.id === id) {
+        const nextState = !s.completed;
+        if (nextState) triggerConfetti();
+        return {
+          ...s,
+          completed: nextState,
+          completedAt: nextState ? new Date().toISOString() : undefined,
+        };
+      }
+      return s;
+    });
+    setShoppingItems(next);
+    guardarEnSupabase({ shoppingItems: next });
+  };
+
+  const deleteShoppingItem = (id: string) => {
+    const next = shoppingItems.filter(s => s.id !== id);
+    setShoppingItems(next);
+    guardarEnSupabase({ shoppingItems: next });
+    showToast('Artículo de compra retirado', 'info');
+  };
+
+  // Expenses mutations
+  const addExpense = (expenseData: Omit<ExpenseItem, 'id'>) => {
+    const newExpense: ExpenseItem = {
+      ...expenseData,
+      id: 'e-' + Date.now(),
+    };
+    const next = [newExpense, ...expenses];
+    setExpenses(next);
+    guardarEnSupabase({ expenses: next });
+    showToast('Gasto registrado correctamente', 'success');
+  };
+
+  const updateExpense = (id: string, updates: Partial<ExpenseItem>) => {
+    const next = expenses.map(e => e.id === id ? { ...e, ...updates } : e);
+    setExpenses(next);
+    guardarEnSupabase({ expenses: next });
+    showToast('Gasto modificado', 'success');
+  };
+
+  const deleteExpense = (id: string) => {
+    const next = expenses.filter(e => e.id !== id);
+    setExpenses(next);
+    guardarEnSupabase({ expenses: next });
+    showToast('Gasto eliminado', 'info');
+  };
+
+  // Calendar mutations
+  const addEvent = (eventData: Omit<CalendarEvent, 'id'>) => {
+    const newEvent: CalendarEvent = {
+      ...eventData,
+      id: 'ev-' + Date.now(),
+    };
+    const next = [...events, newEvent];
+    setEvents(next);
+    guardarEnSupabase({ events: next });
+    showToast('Evento añadido al calendario', 'success');
+  };
+
+  const updateEvent = (id: string, updates: Partial<CalendarEvent>) => {
+    const next = events.map(e => e.id === id ? { ...e, ...updates } : e);
+    setEvents(next);
+    guardarEnSupabase({ events: next });
+    showToast('Evento actualizado', 'success');
+  };
+
+  const deleteEvent = (id: string) => {
+    const next = events.filter(e => e.id !== id);
+    setEvents(next);
+    guardarEnSupabase({ events: next });
+    showToast('Evento cancelado', 'info');
+  };
+
+  // Documents mutations
+  const addDocument = (docData: Omit<DocumentItem, 'id' | 'uploadDate'>) => {
+    const newDoc: DocumentItem = {
+      ...docData,
+      id: 'd-' + Date.now(),
+      uploadDate: new Date().toISOString().split('T')[0],
+    };
+    const next = [newDoc, ...documents];
+    setDocuments(next);
+    guardarEnSupabase({ documents: next });
+    showToast('Documento guardado en la bóveda', 'success');
+  };
+
+  const updateDocument = (id: string, updates: Partial<DocumentItem>) => {
+    const next = documents.map(d => d.id === id ? { ...d, ...updates } : d);
+    setDocuments(next);
+    guardarEnSupabase({ documents: next });
+    showToast('Documento actualizado', 'success');
+  };
+
+  const deleteDocument = (id: string) => {
+    const next = documents.filter(d => d.id !== id);
+    setDocuments(next);
+    guardarEnSupabase({ documents: next });
+    showToast('Documento eliminado', 'info');
+  };
+
+  // Chores mutations
+  const rotateChore = (id: string) => {
+    const next = chores.map(c => {
+      if (c.id === id) {
+        const nextIdx = (c.currentMemberIndex + 1) % c.assignedMemberIds.length;
+        return {
+          ...c,
+          currentMemberIndex: nextIdx,
+          lastRotatedDate: new Date().toISOString().split('T')[0],
+          completedToday: false,
+        };
+      }
+      return c;
+    });
+    setChores(next);
+    guardarEnSupabase({ chores: next });
+    showToast('Turno de tarea rotado', 'success');
+  };
+
+  const toggleChoreCompleted = (id: string) => {
+    const next = chores.map(c => {
+      if (c.id === id) {
+        const state = !c.completedToday;
+        if (state) triggerConfetti();
+        return { ...c, completedToday: state };
+      }
+      return c;
+    });
+    setChores(next);
+    guardarEnSupabase({ chores: next });
+  };
+
+  const swapChoreMember = (id: string, targetMemberId: string) => {
+    const next = chores.map(c => {
+      if (c.id === id) {
+        const idx = c.assignedMemberIds.indexOf(targetMemberId);
+        if (idx !== -1) {
+          return { ...c, currentMemberIndex: idx };
+        }
+      }
+      return c;
+    });
+    setChores(next);
+    guardarEnSupabase({ chores: next });
+    showToast('Responsable de la tarea cambiado', 'success');
+  };
+
+  const addChore = (choreData: Omit<ChoreRotation, 'id' | 'lastRotatedDate' | 'completedToday' | 'currentMemberIndex'>) => {
+    const newChore: ChoreRotation = {
+      ...choreData,
+      id: 'c-' + Date.now(),
+      currentMemberIndex: 0,
+      completedToday: false,
+      lastRotatedDate: new Date().toISOString().split('T')[0],
+    };
+    const next = [...chores, newChore];
+    setChores(next);
+    guardarEnSupabase({ chores: next });
+    showToast('Nueva rutina de hogar creada', 'success');
+  };
+
+  const updateChore = (id: string, updates: Partial<ChoreRotation>) => {
+    const next = chores.map(c => c.id === id ? { ...c, ...updates } : c);
+    setChores(next);
+    guardarEnSupabase({ chores: next });
+    showToast('Rutina actualizada', 'success');
+  };
+
+  const deleteChore = (id: string) => {
+    const next = chores.filter(c => c.id !== id);
+    setChores(next);
+    guardarEnSupabase({ chores: next });
+    showToast('Rutina eliminada', 'info');
+  };
+
+  // Meals mutations
+  const updateMealDay = (dayName: string, updates: Partial<MealPlanDay>) => {
+    const next = meals.map(m => m.day === dayName ? { ...m, ...updates } : m);
+    setMeals(next);
+    guardarEnSupabase({ meals: next });
+    showToast('Menú del día actualizado', 'success');
+  };
+
+  const clearMealDay = (dayName: string) => {
+    const next = meals.map(m => m.day === dayName ? { day: dayName, breakfast: '', lunch: '', dinner: '', snacks: '' } : m);
+    setMeals(next);
+    guardarEnSupabase({ meals: next });
+    showToast('Menú del día limpiado', 'info');
+  };
+
+  const exportMealPlanToShoppingList = (): number => {
+    let addedCount = 0;
+    const newItems: Array<Omit<ShoppingItem, 'id' | 'createdAt' | 'completed'>> = [];
+
+    meals.forEach(m => {
+      [m.breakfast, m.lunch, m.dinner, m.snacks].forEach(meal => {
+        if (meal && meal.trim()) {
+          newItems.push({
+            name: meal.trim(),
+            category: 'Supermercado',
+            quantity: 1,
+            unit: 'unidad',
+            assignedTo: 'all',
+          });
+          addedCount++;
+        }
+      });
+    });
+
+    if (newItems.length > 0) {
+      addMultipleShoppingItems(newItems);
+      showToast(`Se agregaron ${addedCount} ingredientes al menú de compras`, 'success');
+    }
+    return addedCount;
+  };
+
+  // Notifications
+  const sendEmailReminder = (params: { to: string; subject: string; body: string; sourceType: 'calendario' | 'tarea' | 'documento' | 'salud'; title?: string }) => {
+    const log: EmailNotificationLog = {
+      id: 'em-' + Date.now(),
+      to: params.to,
+      subject: params.subject,
+      body: params.body,
+      sourceType: params.sourceType,
+      sentAt: new Date().toISOString(),
+      status: 'sent',
+    };
+    setSentEmails(prev => [log, ...prev]);
+    showToast(`Notificación enviada a ${params.to}`, 'success');
+  };
+
+  const clearSentEmails = () => setSentEmails([]);
+
+  const requestBrowserNotifications = async (): Promise<boolean> => {
+    if (!('Notification' in window)) return false;
+    const perm = await Notification.requestPermission();
+    const isGranted = perm === 'granted';
+    setBrowserNotificationsEnabled(isGranted);
+    return isGranted;
+  };
+
+  // Gallery mutations
+  const addPhoto = (photoData: Omit<GalleryPhoto, 'id' | 'likes'>) => {
+    const newPhoto: GalleryPhoto = {
+      ...photoData,
+      id: 'p-' + Date.now(),
+      likes: 0,
+    };
+    const next = [newPhoto, ...photos];
+    setPhotos(next);
+    guardarEnSupabase({ photos: next });
+    showToast('Foto subida al álbum familiar', 'success');
+  };
+
+  const deletePhoto = (id: string) => {
+    const next = photos.filter(p => p.id !== id);
+    setPhotos(next);
+    guardarEnSupabase({ photos: next });
+    showToast('Foto eliminada', 'info');
+  };
+
+  const likePhoto = (id: string) => {
+    const next = photos.map(p => p.id === id ? { ...p, likes: p.likes + 1 } : p);
+    setPhotos(next);
+    guardarEnSupabase({ photos: next });
+    triggerConfetti();
+  };
+
+  const addAlbum = (albumData: Omit<GalleryAlbum, 'id'>) => {
+    const newAlbum: GalleryAlbum = {
+      ...albumData,
+      id: 'alb-' + Date.now(),
+    };
+    const next = [...albums, newAlbum];
+    setAlbums(next);
+    guardarEnSupabase({ albums: next });
+    showToast('Nuevo álbum creado', 'success');
+  };
+
+  // Health mutations
+  const toggleMedicationTaken = (id: string) => {
+    const next = medications.map(m => {
+      if (m.id === id) {
+        const state = !m.takenToday;
+        if (state) triggerConfetti();
+        return { ...m, takenToday: state };
+      }
+      return m;
+    });
+    setMedications(next);
+    guardarEnSupabase({ medications: next });
+  };
+
+  const addMedication = (medData: Omit<MedicationReminder, 'id' | 'takenToday'>) => {
+    const newMed: MedicationReminder = {
+      ...medData,
+      id: 'med-' + Date.now(),
+      takenToday: false,
+    };
+    const next = [...medications, newMed];
+    setMedications(next);
+    guardarEnSupabase({ medications: next });
+    showToast('Recordatorio de medicamento registrado', 'success');
+  };
+
+  const updateMedication = (id: string, updates: Partial<MedicationReminder>) => {
+    const next = medications.map(m => m.id === id ? { ...m, ...updates } : m);
+    setMedications(next);
+    guardarEnSupabase({ medications: next });
+    showToast('Medicamento actualizado', 'success');
+  };
+
+  const deleteMedication = (id: string) => {
+    const next = medications.filter(m => m.id !== id);
+    setMedications(next);
+    guardarEnSupabase({ medications: next });
+    showToast('Medicamento eliminado', 'info');
+  };
+
+  const addMedicalRecord = (recData: Omit<MedicalRecord, 'id'>) => {
+    const newRec: MedicalRecord = {
+      ...recData,
+      id: 'rec-' + Date.now(),
+    };
+    const next = [newRec, ...medicalRecords];
+    setMedicalRecords(next);
+    guardarEnSupabase({ medicalRecords: next });
+    showToast('Historial médico guardado', 'success');
+  };
+
+  const updateMedicalRecord = (id: string, updates: Partial<MedicalRecord>) => {
+    const next = medicalRecords.map(r => r.id === id ? { ...r, ...updates } : r);
+    setMedicalRecords(next);
+    guardarEnSupabase({ medicalRecords: next });
+    showToast('Registro médico actualizado', 'success');
+  };
+
+  const deleteMedicalRecord = (id: string) => {
+    const next = medicalRecords.filter(r => r.id !== id);
+    setMedicalRecords(next);
+    guardarEnSupabase({ medicalRecords: next });
+    showToast('Registro médico eliminado', 'info');
+  };
+
+  return (
+    <FamilyContext.Provider value={{
+      currentUser, login, register, logout, isAuthModalOpen, authModalMode, openAuthModal, closeAuthModal,
+      activeTab, setActiveTab, activeMemberId, setActiveMemberId, darkMode, toggleDarkMode, familyName, setFamilyName, inviteCode, activeMember,
+      members, addMember, updateMember, updateMemberHealthProfile, deleteMember,
+      tasks, addTask, updateTask, toggleTask, deleteTask,
+      shoppingItems, addShoppingItem, addMultipleShoppingItems, updateShoppingItem, toggleShoppingItem, deleteShoppingItem,
+      expenses, monthlyIncome, savingsGoal, setMonthlyIncome, setSavingsGoal, addExpense, updateExpense, deleteExpense,
+      events, addEvent, updateEvent, deleteEvent,
+      documents, addDocument, updateDocument, deleteDocument,
+      chores, rotateChore, toggleChoreCompleted, swapChoreMember, addChore, updateChore, deleteChore,
+      meals, updateMealDay, clearMealDay, exportMealPlanToShoppingList,
+      sentEmails, sendEmailReminder, clearSentEmails, browserNotificationsEnabled, requestBrowserNotifications,
+      albums, photos, addPhoto, deletePhoto, likePhoto, addAlbum,
+      medications, toggleMedicationTaken, addMedication, updateMedication, deleteMedication,
+      medicalRecords, addMedicalRecord, updateMedicalRecord, deleteMedicalRecord,
+      toasts, showToast, triggerConfetti
+    }}>
+      {children}
+    </FamilyContext.Provider>
+  );
+};
+
+export const useFamily = () => {
+  const context = useContext(FamilyContext);
+  if (!context) {
+    throw new Error('useFamily debe usarse dentro de un FamilyProvider');
+  }
+  return context;
+};
