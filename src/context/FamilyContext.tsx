@@ -1,3 +1,4 @@
+import { supabase } from '../supabaseClient';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { 
