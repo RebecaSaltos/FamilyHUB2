@@ -1,0 +1,6 @@
+{
+  "name": "FamiliApp - Gestión Familiar Integral",
+  "description": "Plataforma integral para familias: listas de tareas y compras, presupuesto compartido, calendario sincronizado, documentos, horarios rotativos, comidas, galería, salud y gestión de miembros.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
